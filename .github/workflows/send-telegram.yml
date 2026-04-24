@@ -1,0 +1,38 @@
+name: Send Telegram Message
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Testo del messaggio da inviare'
+        required: true
+        type: string
+      parse_mode:
+        description: 'Parse mode (HTML/Markdown/none)'
+        required: false
+        type: string
+        default: 'HTML'
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send message to Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MESSAGE: ${{ inputs.message }}
+          PARSE_MODE: ${{ inputs.parse_mode }}
+        run: |
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "parse_mode=${PARSE_MODE}")
+          echo "Telegram API response: $RESPONSE"
+          OK=$(echo "$RESPONSE" | jq -r '.ok')
+          if [ "$OK" != "true" ]; then
+            echo "::error::Telegram API returned error: $RESPONSE"
+            exit 1
+          fi
+          MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.result.message_id')
+          echo "::notice::Message sent successfully. message_id=$MESSAGE_ID"

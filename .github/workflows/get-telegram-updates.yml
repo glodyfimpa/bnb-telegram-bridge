@@ -1,0 +1,41 @@
+name: Get Telegram Updates
+
+on:
+  workflow_dispatch:
+    inputs:
+      since_hours:
+        description: 'Filtra messaggi delle ultime N ore (default 24)'
+        required: false
+        type: string
+        default: '24'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch updates from Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SINCE_HOURS: ${{ inputs.since_hours }}
+        run: |
+          RESPONSE=$(curl -s "https://api.telegram.org/bot${BOT_TOKEN}/getUpdates")
+          OK=$(echo "$RESPONSE" | jq -r '.ok')
+          if [ "$OK" != "true" ]; then
+            echo "::error::Telegram API returned error: $RESPONSE"
+            exit 1
+          fi
+          CUTOFF=$(date -u -d "$SINCE_HOURS hours ago" +%s)
+          FILTERED=$(echo "$RESPONSE" | jq --arg cutoff "$CUTOFF" --arg chat_id "$CHAT_ID" '
+            .result
+            | map(select(.message != null))
+            | map(select((.message.chat.id | tostring) == $chat_id))
+            | map(select(.message.date >= ($cutoff | tonumber)))
+            | map({date: .message.date, text: .message.text, message_id: .message.message_id})
+          ')
+          COUNT=$(echo "$FILTERED" | jq 'length')
+          echo "::notice::Found $COUNT messages in the last $SINCE_HOURS hours"
+          echo ""
+          echo "=== MESSAGES_START ==="
+          echo "$FILTERED" | jq -c '.'
+          echo "=== MESSAGES_END ==="
