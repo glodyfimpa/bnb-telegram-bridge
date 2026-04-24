@@ -9,10 +9,16 @@ on:
         type: string
         default: '24'
 
+permissions:
+  contents: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Fetch updates from Telegram
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -35,7 +41,30 @@ jobs:
           ')
           COUNT=$(echo "$FILTERED" | jq 'length')
           echo "::notice::Found $COUNT messages in the last $SINCE_HOURS hours"
-          echo ""
+
+          mkdir -p state
+          FETCHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq -n \
+            --arg fetched_at "$FETCHED_AT" \
+            --arg since_hours "$SINCE_HOURS" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --argjson count "$COUNT" \
+            --argjson messages "$FILTERED" \
+            '{fetched_at: $fetched_at, since_hours: $since_hours, run_id: $run_id, count: $count, messages: $messages}' \
+            > state/latest-messages.json
+
           echo "=== MESSAGES_START ==="
-          echo "$FILTERED" | jq -c '.'
+          cat state/latest-messages.json
           echo "=== MESSAGES_END ==="
+
+      - name: Commit state/latest-messages.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/latest-messages.json
+          if git diff --staged --quiet; then
+            echo "::notice::No changes in state/latest-messages.json, skipping commit"
+          else
+            git commit -m "chore(state): update latest-messages.json (run ${GITHUB_RUN_ID})"
+            git push
+          fi
