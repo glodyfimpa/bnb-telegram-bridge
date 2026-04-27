@@ -1,13 +1,7 @@
 {
-  "fetched_at": "2026-04-24T17:21:49Z",
+  "fetched_at": "2026-04-27T17:22:14Z",
   "since_hours": "14",
-  "run_id": "24902608476",
-  "count": 1,
-  "messages": [
-    {
-      "date": 1777034587,
-      "text": "Preso il key box",
-      "message_id": 11
-    }
-  ]
+  "run_id": "25009489685",
+  "count": 0,
+  "messages": []
 }
